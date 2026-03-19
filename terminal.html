@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TERMINAL_STATION_7</title>
+    <style>
+        :root {
+            --crt-green: #33ff33;
+            --crt-bg: #080a08;
+            --glow: 0 0 10px rgba(51, 255, 51, 0.5);
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            background: #000;
+            width: 100vw; height: 100vh;
+            overflow: hidden;
+            color: var(--crt-green);
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* --- CRT SCREEN --- */
+        .crt-screen {
+            width: 100%; height: 100%;
+            background: var(--crt-bg);
+            padding: 40px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            position: relative;
+            animation: flicker 0.15s infinite;
+        }
+
+        /* Scanlines & Grain */
+        .crt-screen::before {
+            content: " ";
+            position: fixed; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 3px;
+            z-index: 100; pointer-events: none;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.98; } 50% { opacity: 1; } 100% { opacity: 0.99; }
+        }
+
+        /* --- TERMINAL FLOW --- */
+        #terminal-log {
+            white-space: pre-wrap;
+            line-height: 1.5;
+            text-shadow: 0 0 5px #00ff41;
+        }
+
+        .input-line {
+            display: flex;
+            align-items: center;
+            text-shadow: 0 0 5px #00ff41;
+        }
+
+        .prompt { color: var(--crt-green); margin-right: 10px; font-weight: bold; }
+
+        input {
+            background: transparent; border: none; color: var(--crt-green);
+            font-family: inherit; font-size: 1.1rem; flex: 1;
+            outline: none; text-shadow: inherit;
+        }
+
+        /* Highlighted result */
+        .success-text { color: #fff; text-shadow: 0 0 20px #fff; font-weight: bold; }
+    </style>
+</head>
+<body onclick="document.getElementById('cmd-input').focus()">
+
+<div class="crt-screen" id="screen">
+    <div id="terminal-log">STATION-7 SECURE TERMINAL v6.0.4
+ESTABLISHED ENCRYPTED UPLINK... OK
+SYSTEM DATE: MARCH 19, 2026
+--------------------------------------------------
+TYPE 'help' FOR COMMAND LIST.
+--------------------------------------------------</div>
+    
+    <div class="input-line" id="current-input-line">
+        <span class="prompt">agent@station-7:~$</span>
+        <input type="text" id="cmd-input" autofocus autocomplete="off">
+    </div>
+</div>
+
+<audio id="radio-audio" loop>
+    <source src="https://www.soundjay.com/communication/radio-static-01.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+    const input = document.getElementById('cmd-input');
+    const log = document.getElementById('terminal-log');
+    const screen = document.getElementById('screen');
+    const radio = document.getElementById('radio-audio');
+
+    const SECRET_HEX = "0d1007054d2a13060011194900"; // HELLO FRIEND!
+    const FILES = {
+        'message.enc': `[ENCRYPTED DATA STREAM]\n${SECRET_HEX}`,
+        'sys.log': "10:14 - Signal intercepted.\n10:15 - Logic gate locked.",
+        'emergency.txt': "BURN NOTICE: DESTROY PAD AFTER READING."
+    };
+
+    const commands = {
+        'help': "AVAILABLE COMMANDS:\n  ls        - List directory files\n  cat [f]   - Display file content\n  decrypt   - Run XOR engine (Usage: decrypt [key])\n  radio     - Toggle Numbers Station audio\n  clear     - Clear terminal buffer\n  whoami    - Display current user info\n  exit      - Close session",
+        'ls': () => Object.keys(FILES).join("    "),
+        'whoami': "AUTHORIZED AGENT: #8802\nSECURITY LEVEL: 5 (TOP SECRET)",
+        'clear': "CLEAR",
+        'radio': () => {
+            if (radio.paused) { radio.play(); return "RECEIVER ACTIVE: MONITORING SHORTWAVE..."; }
+            else { radio.pause(); return "RECEIVER DEACTIVATED."; }
+        },
+        'cat': (filename) => FILES[filename] || `cat: ${filename}: No such file or directory`,
+        'decrypt': (key) => {
+            if (!key) return "ERROR: KEY REQUIRED. USAGE: decrypt [KEY]";
+            runXOR(key.toUpperCase());
+            return "INITIALIZING DECRYPTION MODULE...";
+        }
+    };
+
+    input.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+            const fullVal = input.value;
+            const parts = fullVal.trim().split(' ');
+            const cmd = parts[0].toLowerCase();
+            const arg = parts.slice(1).join(' ');
+
+            // 1. Move the current line to history
+            log.innerText += `\nagent@station-7:~$ ${fullVal}`;
+            
+            // 2. Process command
+            if (cmd === 'clear') {
+                log.innerText = "STATION-7 REBOOTED...";
+            } else if (commands[cmd]) {
+                const result = (typeof commands[cmd] === 'function') ? commands[cmd](arg) : commands[cmd];
+                if (result) log.innerText += "\n" + result;
+            } else if (cmd !== "") {
+                log.innerText += `\nbash: ${cmd}: command not found`;
+            }
+
+            // 3. Reset input
+            input.value = "";
+            screen.scrollTop = screen.scrollHeight;
+        }
+    });
+
+    async function runXOR(key) {
+        log.innerText += `\n> LOADING KEYSTREAM: [ ${key} ]`;
+        const cBytes = [];
+        for(let i=0; i<SECRET_HEX.length; i+=2) cBytes.push(parseInt(SECRET_HEX.substr(i, 2), 16));
+        const kBytes = new TextEncoder().encode(key);
+
+        let result = "";
+        log.innerText += "\n--------------------------------------------------";
+        for(let i=0; i<cBytes.length; i++) {
+            const kByte = kBytes[i % kBytes.length];
+            const resChar = String.fromCharCode(cBytes[i] ^ kByte);
+            result += resChar;
+            log.innerText += `\nOFFSET [${i.toString().padStart(2,'0')}] : 0x${cBytes[i].toString(16).toUpperCase()} ^ '${String.fromCharCode(kByte)}' => '${resChar}'`;
+            screen.scrollTop = screen.scrollHeight;
+            await new Promise(r => setTimeout(r, 100));
+        }
+        log.innerText += "\n--------------------------------------------------";
+        log.innerText += `\n[SUCCESS] MESSAGE RECONSTRUCTED:\n>>> ${result} <<<`;
+        screen.scrollTop = screen.scrollHeight;
+    }
+</script>
+</body>
+</html>
