@@ -1,2 +1,2 @@
 # cypher
-html tool for fun
+html game for fun
