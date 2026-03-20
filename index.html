@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>TERMINAL_STATION_7</title>
+    <title>TERMINAL_STATION_7_SECURE</title>
     <style>
         :root {
             --crt-green: #33ff33;
@@ -17,9 +17,12 @@
             overflow: hidden;
             color: var(--crt-green);
             font-family: 'Courier New', Courier, monospace;
+            /* 改善選取體驗 */
+            selection-background-color: var(--crt-green);
+            selection-color: #000;
         }
 
-        /* --- CRT SCREEN --- */
+        /* --- CRT 視覺強化層 --- */
         .crt-screen {
             width: 100%; height: 100%;
             background: var(--crt-bg);
@@ -30,30 +33,55 @@
             animation: flicker 0.15s infinite;
         }
 
-        /* Scanlines & Grain */
         .crt-screen::before {
             content: " ";
             position: fixed; top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
-            background-size: 100% 3px;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%),
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%;
             z-index: 100; pointer-events: none;
         }
 
-        @keyframes flicker {
-            0% { opacity: 0.98; } 50% { opacity: 1; } 100% { opacity: 0.99; }
+        .crt-screen::after {
+            content: " ";
+            position: fixed; top: 0; left: 0; bottom: 0; right: 0;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0;
+            z-index: 101;
+            pointer-events: none;
+            animation: scanline 10s linear infinite;
         }
 
-        /* --- TERMINAL FLOW --- */
+        .vignette {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.8) 150%);
+            z-index: 102; pointer-events: none;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.98; } 50% { opacity: 1.0; } 100% { opacity: 0.99; }
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); opacity: 0.05; }
+            10% { opacity: 0.1; }
+            100% { transform: translateY(100%); opacity: 0.05; }
+        }
+
         #terminal-log {
             white-space: pre-wrap;
             line-height: 1.5;
-            text-shadow: 0 0 5px #00ff41;
+            text-shadow: 2px 0 1px rgba(255,0,0,0.2), -2px 0 1px rgba(0,0,255,0.2), 0 0 5px #00ff41;
+            /* 允許選取文字 */
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .input-line {
             display: flex;
             align-items: center;
             text-shadow: 0 0 5px #00ff41;
+            margin-top: 10px;
         }
 
         .prompt { color: var(--crt-green); margin-right: 10px; font-weight: bold; }
@@ -63,17 +91,15 @@
             font-family: inherit; font-size: 1.1rem; flex: 1;
             outline: none; text-shadow: inherit;
         }
-
-        /* Highlighted result */
-        .success-text { color: #fff; text-shadow: 0 0 20px #fff; font-weight: bold; }
     </style>
 </head>
-<body onclick="document.getElementById('cmd-input').focus()">
+<body id="terminal-body">
 
+<div class="vignette"></div>
 <div class="crt-screen" id="screen">
     <div id="terminal-log">STATION-7 SECURE TERMINAL v6.0.4
 ESTABLISHED ENCRYPTED UPLINK... OK
-SYSTEM DATE: MARCH 19, 2026
+SYSTEM DATE: MARCH 20, 2026
 --------------------------------------------------
 TYPE 'help' FOR COMMAND LIST.
 --------------------------------------------------</div>
@@ -84,51 +110,126 @@ TYPE 'help' FOR COMMAND LIST.
     </div>
 </div>
 
-<audio id="radio-audio" loop>
-    <source src="Cherry_Ripe_(number_station).mp3" type="audio/mpeg">
-</audio>
-
+<audio id="audio-E03" loop><source src="Cherry_Ripe_(number_station).mp3" type="audio/mpeg"></audio>
+<audio id="audio-E15" loop><source src="20 - 2 Letter 'YS'.mp3" type="audio/mpeg"></audio>
 <script>
     const input = document.getElementById('cmd-input');
     const log = document.getElementById('terminal-log');
     const screen = document.getElementById('screen');
-    const radio = document.getElementById('radio-audio');
+    const body = document.getElementById('terminal-body');
+    
+    let currentActiveAudio = null;
+    let radioInterval = null;
 
-    const SECRET_HEX = "0d1007054d2a13060011194900"; // HELLO FRIEND!
+    // 解決問題 2: 點擊 body 時，若無選取文字則聚焦
+    body.addEventListener('click', () => {
+        const selection = window.getSelection().toString();
+        if (!selection) {
+            input.focus();
+        }
+    });
+
+    const SECRET_HEX = "0d1007054d2a13060011194900"; 
     const FILES = {
         'message.enc': `[ENCRYPTED DATA STREAM]\n${SECRET_HEX}`,
-        'sys.log': "10:14 - Signal intercepted.\n10:15 - Logic gate locked.",
+        'sys.log': "10:14 - Signal intercepted.\n10:15 - Logic gate locked.\n10:17 - Monitoring frequency: E03",
         'emergency.txt': "BURN NOTICE: DESTROY PAD AFTER READING."
     };
 
+    const stations = {
+        '-E03': { id: 'audio-E03', name: 'STATION E03' },
+        '-E15': { id: 'audio-E15', name: 'STATION E15' }
+        // 若要支援 -E04，請在此新增： '-E04': { id: 'audio-E04', name: 'STATION E04' }
+    };
+
     const commands = {
-        'help': "AVAILABLE COMMANDS:\n  ls        - List directory files\n  cat [f]   - Display file content\n  decrypt   - Run XOR engine (Usage: decrypt [key])\n  radio     - Toggle Numbers Station audio\n  clear     - Clear terminal buffer\n  whoami    - Display current user info\n  exit      - Close session",
+        'help': "AVAILABLE COMMANDS:\n  ls        - List directory files\n  cat [f]   - Display file content\n  decrypt   - Run XOR engine (Usage: decrypt [key])\n  radio     - Toggle Numbers Station (Usage: radio -[station])\n  clear     - Clear terminal buffer\n  whoami    - Display current user info\n  exit      - Close session",
         'ls': () => Object.keys(FILES).join("    "),
         'whoami': "AUTHORIZED AGENT: #8802\nSECURITY LEVEL: 5 (TOP SECRET)",
         'clear': "CLEAR",
-        'radio': () => {
-            if (radio.paused) { radio.play(); return "RECEIVER ACTIVE: MONITORING SHORTWAVE..."; }
-            else { radio.pause(); return "RECEIVER DEACTIVATED."; }
-        },
         'cat': (filename) => FILES[filename] || `cat: ${filename}: No such file or directory`,
+        'radio': (arg) => {
+            if (!arg) {
+                if (currentActiveAudio) {
+                    stopRadio();
+                    return "RECEIVER DEACTIVATED.";
+                }
+                return "ERROR: CODE REQUIRED";
+            }
+            const station = stations[arg.toUpperCase()];
+            if (station) {
+                return playRadio(station);
+            } else {
+                return `ERROR: UNKNOWN FREQUENCY [${arg}]`;
+            }
+        },
         'decrypt': (key) => {
-            if (!key) return "ERROR: KEY REQUIRED. USAGE: decrypt [KEY]";
+            if (!key) return "ERROR: KEY REQUIRED";
             runXOR(key.toUpperCase());
             return "INITIALIZING DECRYPTION MODULE...";
         }
     };
 
+    function playRadio(station) {
+        if (currentActiveAudio) stopRadio();
+        const audio = document.getElementById(station.id);
+        if (audio) {
+            audio.play().catch(e => console.log("Interaction required."));
+            currentActiveAudio = audio;
+            startRadioAnimation(station.name);
+            return null; 
+        }
+        return "ERROR: HARDWARE FAILURE.";
+    }
+
+    function stopRadio() {
+        if (currentActiveAudio) {
+            currentActiveAudio.pause();
+            currentActiveAudio.currentTime = 0;
+            currentActiveAudio = null;
+        }
+        if (radioInterval) {
+            clearInterval(radioInterval);
+            radioInterval = null;
+        }
+    }
+
+    function startRadioAnimation(stationName) {
+        // 先清除之前的動畫
+        if (radioInterval) clearInterval(radioInterval);
+        
+        let dots = 0;
+        const techInfo = `\nMONITORING SHORTWAVE\n[Tuning...] SUCCESS.\nSIGNAL STRENGTH: WEAK\nFREQUENCY: 5.420 MHz`;
+        log.innerText += techInfo + "\nMONITORING SHORTWAVE";
+        
+        radioInterval = setInterval(() => {
+            dots = (dots + 1) % 4;
+            const dotStr = ".".repeat(dots);
+            const lines = log.innerText.split('\n');
+            // 只在「最後一行」確實是監測訊息時才更新
+            if (lines[lines.length - 1].startsWith("MONITORING SHORTWAVE")) {
+                lines[lines.length - 1] = `MONITORING SHORTWAVE${dotStr}`;
+                log.innerText = lines.join('\n');
+                screen.scrollTop = screen.scrollHeight;
+            }
+        }, 500);
+    }
+
     input.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter') {
+            // 解決問題 1: 一旦執行新指令，停止之前的 radio 文字動畫
+            if (radioInterval) {
+                clearInterval(radioInterval);
+                radioInterval = null;
+            }
+
             const fullVal = input.value;
             const parts = fullVal.trim().split(' ');
             const cmd = parts[0].toLowerCase();
             const arg = parts.slice(1).join(' ');
 
-            // 1. Move the current line to history
             log.innerText += `\nagent@station-7:~$ ${fullVal}`;
             
-            // 2. Process command
             if (cmd === 'clear') {
                 log.innerText = "STATION-7 REBOOTED...";
             } else if (commands[cmd]) {
@@ -138,32 +239,37 @@ TYPE 'help' FOR COMMAND LIST.
                 log.innerText += `\nbash: ${cmd}: command not found`;
             }
 
-            // 3. Reset input
             input.value = "";
             screen.scrollTop = screen.scrollHeight;
         }
     });
 
     async function runXOR(key) {
-        log.innerText += `\n> LOADING KEYSTREAM: [ ${key} ]`;
-        const cBytes = [];
-        for(let i=0; i<SECRET_HEX.length; i+=2) cBytes.push(parseInt(SECRET_HEX.substr(i, 2), 16));
-        const kBytes = new TextEncoder().encode(key);
+    log.innerText += `\n> LOADING KEYSTREAM: [ ${key} ]`;
+    const cBytes = [];
+    for(let i=0; i<SECRET_HEX.length; i+=2) cBytes.push(parseInt(SECRET_HEX.substr(i, 2), 16));
+    const kBytes = new TextEncoder().encode(key);
 
-        let result = "";
-        log.innerText += "\n--------------------------------------------------";
-        for(let i=0; i<cBytes.length; i++) {
-            const kByte = kBytes[i % kBytes.length];
-            const resChar = String.fromCharCode(cBytes[i] ^ kByte);
-            result += resChar;
-            log.innerText += `\nOFFSET [${i.toString().padStart(2,'0')}] : 0x${cBytes[i].toString(16).toUpperCase()} ^ '${String.fromCharCode(kByte)}' => '${resChar}'`;
-            screen.scrollTop = screen.scrollHeight;
-            await new Promise(r => setTimeout(r, 100));
-        }
-        log.innerText += "\n--------------------------------------------------";
-        log.innerText += `\n[SUCCESS] MESSAGE RECONSTRUCTED:\n>>> ${result} <<<`;
+    let result = "";
+    log.innerText += "\n--------------------------------------------------";
+    
+    // 執行逐位元 XOR 運算過程
+    for(let i=0; i<cBytes.length; i++) {
+        const kByte = kBytes[i % kBytes.length];
+        const resChar = String.fromCharCode(cBytes[i] ^ kByte);
+        result += resChar;
+        
+        log.innerText += `\nOFFSET [${i.toString().padStart(2,'0')}] : 0x${cBytes[i].toString(16).toUpperCase()} ^ '${String.fromCharCode(kByte)}' => '${resChar}'`;
+        
         screen.scrollTop = screen.scrollHeight;
+        await new Promise(r => setTimeout(r, 50));
     }
+
+    // 直接輸出結果，由玩家自行判斷是否正確
+    log.innerText += "\n--------------------------------------------------";
+    log.innerText += `\n[DECRYPTION COMPLETE] OUTPUT STREAM:\n>>> ${result} <<<`;
+    screen.scrollTop = screen.scrollHeight;
+}
 </script>
 </body>
 </html>
