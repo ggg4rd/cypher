@@ -110,8 +110,13 @@ TYPE 'help' FOR COMMAND LIST.
     </div>
 </div>
 
+<audio id="audio-E01" loop><source src="AFTER YOU GET WHAT YOU WANT YOU DON'T WANT  - EDDIE NELSON.mp3" type="audio/mpeg"></audio>
+<audio id="audio-E02" loop><source src="16 - German Man.mp3" type="audio/mpeg"></audio>
 <audio id="audio-E03" loop><source src="Cherry_Ripe_(number_station).mp3" type="audio/mpeg"></audio>
-<audio id="audio-E15" loop><source src="20 - 2 Letter 'YS'.mp3" type="audio/mpeg"></audio>
+<audio id="audio-E04" loop><source src="freesound_community-fm-radio-static-82334.mp3" type="audio/mpeg"></audio>
+<audio id="audio-E05" loop><source src="20 - 2 Letter 'YS'.mp3" type="audio/mpeg"></audio>
+<audio id="audio-E06" loop><source src="06 - The Lincolnshire Poacher.mp3" type="audio/mpeg"></audio>
+<audio id="audio-E07" loop><source src="I DON'T WANT TO WALK WITHOUT - DON PABLO and his ORCHESTRA.mp3" type="audio/mpeg"></audio>
 <script>
     const input = document.getElementById('cmd-input');
     const log = document.getElementById('terminal-log');
@@ -129,17 +134,23 @@ TYPE 'help' FOR COMMAND LIST.
         }
     });
 
-    const SECRET_HEX = "0d1007054d2a13060011194900"; 
+    const SECRET_HEX = "7b2d3c307a2c2a3964282b3b222374322e322a567827555038581740222f39402212214a2726177d23353b3b422d761f39222e2f2568060e"; 
     const FILES = {
         'message.enc': `[ENCRYPTED DATA STREAM]\n${SECRET_HEX}`,
-        'sys.log': "10:14 - Signal intercepted.\n10:15 - Logic gate locked.\n10:17 - Monitoring frequency: E03",
+        'sys.log': "10:14 - Signal intercepted.\n10:15 - Logic gate locked.\n",
         'emergency.txt': "BURN NOTICE: DESTROY PAD AFTER READING."
     };
 
     const stations = {
+        '-E01': { id: 'audio-E01', name: 'STATION E01' },
+        '-E02': { id: 'audio-E02', name: 'STATION E02' },
         '-E03': { id: 'audio-E03', name: 'STATION E03' },
-        '-E15': { id: 'audio-E15', name: 'STATION E15' }
+        '-E04': { id: 'audio-E04', name: 'STATION E04' },
+        '-E05': { id: 'audio-E05', name: 'STATION E05' },
+        '-E06': { id: 'audio-E06', name: 'STATION E06' },
+        '-E07': { id: 'audio-E07', name: 'STATION E07' },
         // 若要支援 -E04，請在此新增： '-E04': { id: 'audio-E04', name: 'STATION E04' }
+	
     };
 
     const commands = {
@@ -199,7 +210,7 @@ TYPE 'help' FOR COMMAND LIST.
         if (radioInterval) clearInterval(radioInterval);
         
         let dots = 0;
-        const techInfo = `\nMONITORING SHORTWAVE\n[Tuning...] SUCCESS.\nSIGNAL STRENGTH: WEAK\nFREQUENCY: 5.420 MHz`;
+        const techInfo = `\nACTIVATING SHORTWAVE RECIEVER...\n[Tuning...] SUCCESS.\nSIGNAL STRENGTH: WEAK\nFREQUENCY: CLASSIFIED`;
         log.innerText += techInfo + "\nMONITORING SHORTWAVE";
         
         radioInterval = setInterval(() => {
